@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Globe with D3</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            visibility: hidden;
+        }
+
+        .legend-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            max-height: 200px;
+            /* Adjust height as needed */
+            width: 400px;
+            /* Adjust width as needed */
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .legend {
+            font-size: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+
+        .legend-title {
+            font-size: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            margin-bottom: 5px;
+            font-weight: bold;
+            line-height: 1.4;
+        }
+
+        .legend-rect {
+            width: 40px;
+            height: 40px;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Olympic Medals by Discipline and Year</h1>
+
+    <label for="year-select">Select Year: </label>
+    <select id="year-select"></select>
+
+    <label for="discipline-select">Select Discipline: </label>
+    <select id="discipline-select"></select>
+
+    <label for="participant-select">Select Participant Type: </label>
+    <select id="participant-select">
+        <option>All</option>
+        <option>Athlete</option>
+        <option>GameTeam</option>
+    </select>
+
+    <label for="gender-select">Select Gender: </label>
+    <select id="gender-select">
+        <option>All</option>
+        <option>Women</option>
+        <option>Men</option>
+        <option>Mixed</option>
+        <option>Open</option>
+    </select>
+
+    <div class="tooltip" id="tooltip"></div>
+    <svg width="1600" height="800"></svg>
+
+    <div id="legend" class="legend-container"></div> <!-- Legend container -->
+    <script src="shapes.js"></script>
+    <script src="legend.js"></script>
+    <script>
+        const width = 1600;
+        const height = 700;
+        const svg = d3.select("svg");
+
+        const tooltip = d3.select("#tooltip");
+
+        const projection = d3.geoOrthographic()
+            .scale(250)
+            .translate([width / 2, height / 2]);
+
+        const path = d3.geoPath().projection(projection);
+
+        const graticule = d3.geoGraticule();
+
+        svg.append("path")
+            .datum(graticule)
+            .attr("d", path)
+            .attr("fill", "none")
+            .attr("stroke", "#ccc");
+
+
+
+
+        // Load world map data
+        d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson")
+            .then(world => {
+                svg.append("path")
+                    .datum(world)
+                    .attr("d", path)
+                    .attr("fill", "#333333")
+                    .attr("stroke", "#fff");
+
+                // Load and parse the CSV file
+                d3.csv("olympic_medals.csv").then(data => {
+                    console.log("Loaded Data:", data); // Log the loaded data to check if it's correct
+                    const uniqueDisciplines = [...new Set(data.map(d => d.discipline_title))];
+
+                    const { allThemes, colorScale, sportColors, legend } = setupLegend(uniqueDisciplines);
+
+                    // Populate year dropdown
+                    const years = [...new Set(data.map(d => d.slug_game.split('-').pop()))];
+                    const yearSelect = d3.select("#year-select");
+                    const participantSelect = d3.select("#participant-select");
+                    const genderSelect = d3.select("#gender-select");
+
+                    yearSelect.append("option")
+                        .attr("value", "all")
+                        .text("All Years");
+
+                    years.forEach(year => {
+                        yearSelect.append("option")
+                            .attr("value", year)
+                            .text(year);
+                    });
+
+                    let selectedYear = "all";
+                    let selectedParticipant = "All";
+                    let selectedGender = "All";
+                    populateDisciplineDropdown(selectedYear);
+                    processDisciplineData(selectedYear, selectedParticipant, selectedGender);
+
+                    yearSelect.on("change", function () {
+                        selectedYear = this.value;
+                        populateDisciplineDropdown(selectedYear);
+                        processDisciplineData(selectedYear, selectedParticipant, selectedGender);
+                    });
+
+                    participantSelect.on("change", function () {
+                        selectedParticipant = this.value
+                        processDisciplineData(selectedYear, selectedParticipant, selectedGender);
+                    });
+
+                    genderSelect.on("change", function () {
+                        selectedGender = this.value
+                        processDisciplineData(selectedYear, selectedParticipant, selectedGender);
+                    });
+
+                    function populateDisciplineDropdown(year) {
+                        const disciplinesForYear = year === "all"
+                            ? data.map(d => d.discipline_title)
+                            : data.filter(d => d.slug_game.split('-').pop() === year).map(d => d.discipline_title);
+
+                        const uniqueDisciplines = [...new Set(disciplinesForYear)];
+                        console.log("Unique Disciplines:", uniqueDisciplines); // Log unique disciplines
+                        const disciplineSelect = d3.select("#discipline-select");
+
+                        disciplineSelect.on("change", function () {
+                            processDisciplineData(selectedYear, selectedParticipant, selectedGender);
+                        });
+
+                        disciplineSelect.selectAll("option").remove();
+
+                        uniqueDisciplines.forEach(discipline => {
+                            disciplineSelect.append("option")
+                                .attr("value", discipline)
+                                .text(discipline);
+                        });
+                        disciplineSelect.append("option")
+                            .attr("value", "all")
+                            .text("All"); // Add an "All Disciplines" option
+
+                    }
+                    let event_gender = "Mixed"; // Default to null if not found
+
+                    function processDisciplineData(year, selectedParticipantType, selectedGender) {
+                        svg.selectAll("circle, polygon, rect, donut").remove();
+
+                        const selectedDiscipline = d3.select("#discipline-select").node().value;
+
+                        console.log("Selected Discipline:", selectedDiscipline); // Log selected discipline
+                        console.log("Selected Participant Type:", selectedParticipantType); // Log selected participant type
+
+                        // Filter data based on year, discipline, and participant type
+                        const filteredData = year === "all"
+                            ? data.filter(d => selectedDiscipline === "all" || d.discipline_title === selectedDiscipline)
+                            : data.filter(d => {
+                                const eventYear = d.slug_game.split('-').pop();
+                                return (selectedDiscipline === "all" || d.discipline_title === selectedDiscipline) && eventYear === year;
+                            });
+
+
+                        const genderFilteredData = selectedGender === "All"
+                            ? filteredData
+                            : filteredData.filter(d => d.event_gender === selectedGender);
+
+                        const participantFilteredData = selectedParticipantType === "All"
+                            ? genderFilteredData
+                            : genderFilteredData.filter(d => d.participant_type === selectedParticipantType);
+
+
+                        console.log("Filtered Data:", participantFilteredData); // Log final filtered data
+                        const medalCounts = {};
+
+                        // Preprocess data to build medalCounts
+                        participantFilteredData.forEach(d => {
+                            const countryName = (d.country_name === "ROC" || d.country_name === "Olympic Athletes from Russia") ? "Russia" : d.country_name;
+                            const gender = d.event_gender?.toLowerCase();
+                            const discipline = d.discipline_title;
+
+                            if (!countryName || !gender || !discipline) return; // Skip invalid entries
+
+                            // Initialize country and discipline structure
+                            if (!medalCounts[countryName]) {
+                                medalCounts[countryName] = {};
+                            }
+                            if (!medalCounts[countryName][discipline]) {
+                                medalCounts[countryName][discipline] = {
+                                    men: { gold: 0, silver: 0, bronze: 0, teamGold: 0, teamSilver: 0, teamBronze: 0 },
+                                    women: { gold: 0, silver: 0, bronze: 0, teamGold: 0, teamSilver: 0, teamBronze: 0 },
+                                    mixed: { gold: 0, silver: 0, bronze: 0, teamGold: 0, teamSilver: 0, teamBronze: 0 },
+                                    open: { gold: 0, silver: 0, bronze: 0, teamGold: 0, teamSilver: 0, teamBronze: 0 }
+                                };
+                            }
+
+                            // Update medal counts
+                            const medalType = d.medal_type.toLowerCase();
+                            const participantType = d.participant_type === "GameTeam" ? "team" : "";
+                            const medalKey = participantType + medalType.charAt(0).toUpperCase() + medalType.slice(1);
+
+                            if (medalCounts[countryName][discipline][gender][medalKey] !== undefined) {
+                                medalCounts[countryName][discipline][gender][medalKey]++;
+                            }
+                        });
+
+                        // Generate points for visualization
+                        const points = [];
+                        const existingPoints = [];
+
+                        world.features.forEach(d => {
+                            const countryName = d.properties.name;
+                            const centroid = d3.geoCentroid(d);
+                            const area = d3.geoArea(d);
+
+                            const countryMedals = medalCounts[countryName] || {};
+
+                            Object.entries(countryMedals).forEach(([discipline, genders]) => {
+                                Object.entries(genders).forEach(([gender, medals]) => {
+                                    ["gold", "silver", "bronze"].forEach(type => {
+                                        const soloCount = medals[type];
+                                        const teamCount = medals["team" + type.charAt(0).toUpperCase() + type.slice(1)];
+
+                                        // Add solo medals
+                                        if (soloCount > 0) {
+                                            points.push({
+                                                point: generateRandomPointAroundCentroid(centroid, area, existingPoints, 30, d),
+                                                type: type,
+                                                count: soloCount,
+                                                eventType: "solo",
+                                                countryName: countryName,
+                                                disciplineTitle: discipline,
+                                                gender: gender
+                                            });
+                                        }
+
+                                        // Add team medals
+                                        if (teamCount > 0) {
+                                            points.push({
+                                                point: generateRandomPointAroundCentroid(centroid, area, existingPoints, 30, d),
+                                                type: type,
+                                                count: teamCount,
+                                                eventType: "team",
+                                                countryName: countryName,
+                                                disciplineTitle: discipline,
+                                                gender: gender
+                                            });
+                                        }
+                                    });
+                                });
+                            });
+                        });
+
+                        const womenPoints = points.filter(d => d.gender === "women");
+                        const menPoints = points.filter(d => d.gender === "men");
+                        const mixedPoints = points.filter(d => d.gender === "mixed");
+                        const openPoints = points.filter(d => d.gender === "open");
+                        console.log("Sport Colors:", sportColors);
+
+                        renderPoints(womenPoints, "circle", svg, sportColors, selectedDiscipline);  // Render circles for women
+                        renderPoints(menPoints, "polygon", svg, sportColors, selectedDiscipline);  // Render triangles for men
+                        renderPoints(mixedPoints, "rect", svg, sportColors, selectedDiscipline);   // Render rectangles for mixed
+                        renderPoints(openPoints, "donut", svg, sportColors, selectedDiscipline);   // Render rectangles for mixed
+
+                        function updateCirclePositions() {
+                            svg.selectAll("circle")
+                                .attr("cx", d => projection(d.point)[0])
+                                .attr("cy", d => projection(d.point)[1])
+                                .style("visibility", d => {
+                                    const angularDistance = d3.geoDistance(projection.invert([width / 2, height / 2]), d.point);
+                                    return angularDistance > Math.PI / 2 ? "hidden" : "visible";
+                                });
+                        }
+
+                        updateCirclePositions();
+
+                        function updateTrianglePositions() {
+                            svg.selectAll("polygon, rect, star")
+                                .attr("transform", d => {
+                                    const [x, y] = projection(d.point);
+                                    return `translate(${x},${y})`;
+                                })
+                                .style("visibility", d => {
+                                    const angularDistance = d3.geoDistance(projection.invert([width / 2, height / 2]), d.point);
+                                    return angularDistance > Math.PI / 2 ? "hidden" : "visible";
+                                });
+                        }
+
+                        updateTrianglePositions();
+                        // Function to update donut (path) positions
+                        function updateDonutPositions() {
+                            svg.selectAll("g.donut")
+                                .attr("d", d => {
+                                    // Get the projected coordinates for each point
+                                    const [x, y] = projection(d.point);
+
+                                    // Define the outer and inner radius for the donut shape
+                                    const radius = (Math.sqrt(d.count) + 1) * 3;  // Outer radius based on the count
+                                    const innerRadius = radius - 5;  // Inner radius to create the hole
+
+                                    // Generate the donut path with d3.arc
+                                    return d3.arc()({
+                                        innerRadius: innerRadius,
+                                        outerRadius: radius,
+                                        startAngle: 0,
+                                        endAngle: 2 * Math.PI
+                                    });
+                                })
+                                .attr("transform", d => {
+                                    // Position the donut using the projection (x, y)
+                                    const [x, y] = projection(d.point);
+                                    return `translate(${x},${y})`;  // Apply the translate transformation
+                                })
+                                .style("visibility", d => {
+                                    // Calculate the angular distance from the center of the map
+                                    const angularDistance = d3.geoDistance(projection.invert([width / 2, height / 2]), d.point);
+
+                                    // Hide if the angular distance is too far from the center
+                                    return angularDistance > Math.PI / 2 ? "hidden" : "visible";
+                                });
+                        }
+                        updateDonutPositions();
+
+                        svg.call(
+                            d3.drag()
+                                .on("drag", (event) => {
+                                    const rotate = projection.rotate();
+                                    const k = 0.25;
+                                    projection.rotate([rotate[0] + event.dx * k, rotate[1] - event.dy * k]);
+                                    svg.selectAll("path").attr("d", path);
+                                    updateCirclePositions();
+                                    updateTrianglePositions();
+                                    updateDonutPositions();
+                                })
+                        );
+
+                        const zoom = d3.zoom()
+                            .scaleExtent([100, 1000])
+                            .on("zoom", (event) => {
+                                const newScale = event.transform.k * 2;
+                                projection.scale(newScale);
+                                svg.selectAll("path").attr("d", path);
+                                updateCirclePositions();
+                                updateTrianglePositions();
+                                updateDonutPositions();
+                            });
+
+                        svg.call(zoom);
+
+
+
+                    }
+
+                    function generateRandomPointAroundCentroid(centroid, area, existingPoints, baseMinDistance, countryFeature) {
+                        const maxRadius = Math.sqrt(area) * 50; // Adjust dispersion radius
+                        const scaledMinDistance = baseMinDistance * Math.sqrt(area); // Adjust minimum distance
+
+                        for (let attempts = 0; attempts < 200; attempts++) {
+                            const angle = Math.random() * 2 * Math.PI;
+                            const distance = Math.random() * maxRadius;
+                            const lon = centroid[0] + distance * Math.cos(angle);
+                            const lat = centroid[1] + distance * Math.sin(angle);
+
+                            // Ensure the point is within the country's land boundaries
+                            if (!d3.geoContains(countryFeature, [lon, lat])) {
+                                continue; // Skip points outside the land boundaries
+                            }
+
+                            // Ensure the point is within the projection bounds
+                            const projected = projection([lon, lat]);
+                            if (!projected || projected[0] < 0 || projected[0] > width || projected[1] < 0 || projected[1] > height) {
+                                continue; // Skip invalid points
+                            }
+
+                            // Check for overlap with existing points
+                            const isOverlapping = existingPoints.some(([exLon, exLat]) => {
+                                const exProjected = projection([exLon, exLat]);
+                                const dx = exProjected[0] - projected[0];
+                                const dy = exProjected[1] - projected[1];
+                                return Math.sqrt(dx * dx + dy * dy) < scaledMinDistance;
+                            });
+
+                            if (!isOverlapping) {
+                                existingPoints.push([lon, lat]);
+                                return [lon, lat];
+                            }
+                        }
+
+                        console.warn("Could not find a valid point; defaulting to centroid.");
+                        return centroid; // Default fallback
+                    }
+
+
+                });
+            });
+    </script>
+</body>
+
+</html>
