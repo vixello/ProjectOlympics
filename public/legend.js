@@ -24,29 +24,29 @@ function setupLegend(uniqueDisciplines) {
 
     legend.append("div").attr("class", "legend-title").text("Event types: ");
     legend.append("div").attr("class", "legend")
-        .html('<span style="border: 2px solid white; width: 10px; height: 10px; display: inline-block;"></span> Single Stroke (Medal Type)');
+        .html('<span style="border: 2px solid white;  margin-left:1px;width: 13px; height: 13px; display: inline-block;"></span> Single Stroke (Medal Type)');
 
     legend.append("div").attr("class", "legend")
-        .html('<span style="border: 2px dotted white; width: 10px; height: 10px; display: inline-block;"></span> Dotted Stroke (Team Medal Type)');
+        .html('<span style="border: 2px dotted white;  margin-left:1px;width: 13px; height: 13px; display: inline-block;"></span> Dotted Stroke (Team Medal Type)');
 
     legend.append("div").attr("class", "legend-title").text("Gender: ");
 
     // Add a circle 
     legend.append("div").attr("class", "legend")
-        .html('<span style="border-radius: 50%; width: 10px; height: 10px; background-color:#fe00a9; display: inline-block;"></span> Women');
+        .html('<span style="border-radius: 50%; margin-left:1px;margin-right:2px; width: 15px; height: 15px; background-color:#fe00a9; display: inline-block;"></span> Women');
     // Add a triangle 
     legend.append("div").attr("class", "legend")
-        .html('<span style="width: 0; height: 0; border-left: 5.5px solid transparent; border-right: 5.5px solid transparent; border-top: 10px solid #fe00a9; display: inline-block;"></span> Men');
+        .html('<span style="width: 0; height: 0; margin-left:1px; margin-right:2px;border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 13px solid #fe00a9; display: inline-block;"></span> Men');
 
     // Add a rectangle 
     legend.append("div").attr("class", "legend")
-        .html('<span style="width: 10px; height: 10px; background-color: #fe00a9; display: inline-block;"></span> Mixed');
+        .html('<span style="width: 15px; height: 15px; margin-left:1px;margin-right:2px; background-color: #fe00a9; display: inline-block;"></span> Mixed');
 
     // Add a rectangle 
     legend.append("div").attr("class", "legend")
         .html(`
-<span style="position: relative; display: inline-block; width: 10px; height: 10px; background-color: #fe00a9;">
-<span style="position: absolute; top: 2.5px; left:2.5px; width: 5px; height: 5px; background-color: white;"></span>
+<span style="position: relative;  margin-left:1px; margin-right:2px;display: inline-block; width: 15px; height: 15px; background-color: #fe00a9;">
+<span style="position: absolute; top: 4.1px; left:4.1px; width: 7px; height: 7px; background-color: white;"></span>
 </span> Open`);
 
     legend.append("div").attr("class", "legend-title").text("Disciplines: ");
